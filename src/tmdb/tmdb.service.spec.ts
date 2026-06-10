@@ -55,6 +55,31 @@ describe('TmdbService', () => {
     });
   });
 
+  it('fetches the changes feed for a date window', async () => {
+    const payload = {
+      page: 1,
+      results: [{ id: 603, adult: false }],
+      total_pages: 1,
+      total_results: 1,
+    };
+    httpService.get.mockReturnValue(asResponse(payload));
+
+    await expect(createService('key').fetchChangedMovieIds('2026-06-09', 1)).resolves.toEqual(
+      payload,
+    );
+    expect(httpService.get).toHaveBeenCalledWith('/movie/changes', {
+      params: { start_date: '2026-06-09', page: 1, api_key: 'key' },
+    });
+  });
+
+  it('fetches full movie details by id', async () => {
+    const payload = { id: 603, title: 'The Matrix', genres: [{ id: 28, name: 'Action' }] };
+    httpService.get.mockReturnValue(asResponse(payload));
+
+    await expect(createService('key').fetchMovieDetails(603)).resolves.toEqual(payload);
+    expect(httpService.get).toHaveBeenCalledWith('/movie/603', { params: { api_key: 'key' } });
+  });
+
   it('retries transient server errors and succeeds', async () => {
     const payload = { page: 1, results: [], total_pages: 1, total_results: 0 };
     httpService.get

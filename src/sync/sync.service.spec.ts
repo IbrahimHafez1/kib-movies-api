@@ -24,9 +24,15 @@ const tmdbMovie = (id: number, overrides: Partial<TmdbMovie> = {}): TmdbMovie =>
 });
 
 describe('SyncService', () => {
-  let tmdbService: { isConfigured: boolean; fetchGenres: jest.Mock; fetchPopularMovies: jest.Mock };
+  let tmdbService: {
+    isConfigured: boolean;
+    fetchGenres: jest.Mock;
+    fetchPopularMovies: jest.Mock;
+    fetchChangedMovieIds: jest.Mock;
+    fetchMovieDetails: jest.Mock;
+  };
   let genresRepository: { save: jest.Mock; create: jest.Mock; findBy: jest.Mock };
-  let moviesRepository: { save: jest.Mock; create: jest.Mock; count: jest.Mock };
+  let moviesRepository: { save: jest.Mock; create: jest.Mock; count: jest.Mock; find: jest.Mock };
   let cacheService: { del: jest.Mock; bumpNamespaceVersion: jest.Mock };
   let service: SyncService;
 
@@ -48,9 +54,11 @@ describe('SyncService', () => {
       isConfigured: true,
       fetchGenres: jest.fn().mockResolvedValue([{ id: 28, name: 'Action' }]),
       fetchPopularMovies: jest.fn(),
+      fetchChangedMovieIds: jest.fn(),
+      fetchMovieDetails: jest.fn(),
     };
     genresRepository = {
-      save: jest.fn(),
+      save: jest.fn((genres) => genres),
       create: jest.fn((genre) => genre),
       findBy: jest.fn().mockResolvedValue([{ id: 28, name: 'Action' }]),
     };
@@ -58,6 +66,7 @@ describe('SyncService', () => {
       save: jest.fn(),
       create: jest.fn((movie) => movie),
       count: jest.fn(),
+      find: jest.fn().mockResolvedValue([]),
     };
     cacheService = { del: jest.fn(), bumpNamespaceVersion: jest.fn() };
     service = createService();
@@ -141,6 +150,122 @@ describe('SyncService', () => {
 
       await expect(service.syncAll()).resolves.toEqual({ genres: 1, movies: 0 });
       expect(moviesRepository.save).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('syncChangedMovies', () => {
+    const movieDetails = (id: number) => ({
+      id,
+      title: `Movie ${id}`,
+      original_title: `Movie ${id}`,
+      overview: 'Updated overview',
+      release_date: '2020-01-01',
+      poster_path: '/poster.jpg',
+      backdrop_path: '/backdrop.jpg',
+      original_language: 'en',
+      popularity: 50,
+      vote_average: 8,
+      vote_count: 500,
+      genres: [{ id: 28, name: 'Action' }],
+    });
+
+    it('skips when no TMDB key is configured', async () => {
+      tmdbService.isConfigured = false;
+
+      await expect(service.syncChangedMovies()).resolves.toBe(0);
+      expect(tmdbService.fetchChangedMovieIds).not.toHaveBeenCalled();
+    });
+
+    it('skips when no movies are tracked yet', async () => {
+      moviesRepository.find.mockResolvedValue([]);
+
+      await expect(service.syncChangedMovies()).resolves.toBe(0);
+      expect(tmdbService.fetchChangedMovieIds).not.toHaveBeenCalled();
+    });
+
+    it('refreshes only tracked movies that appear in the changes feed', async () => {
+      moviesRepository.find.mockResolvedValue([{ id: 1 }, { id: 2 }]);
+      tmdbService.fetchChangedMovieIds.mockResolvedValue({
+        page: 1,
+        results: [{ id: 1 }, { id: 999 }],
+        total_pages: 1,
+        total_results: 2,
+      });
+      tmdbService.fetchMovieDetails.mockResolvedValue(movieDetails(1));
+
+      await expect(service.syncChangedMovies()).resolves.toBe(1);
+
+      expect(tmdbService.fetchChangedMovieIds).toHaveBeenCalledWith(
+        expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+        1,
+      );
+      expect(tmdbService.fetchMovieDetails).toHaveBeenCalledTimes(1);
+      expect(tmdbService.fetchMovieDetails).toHaveBeenCalledWith(1);
+      expect(moviesRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 1, genres: [{ id: 28, name: 'Action' }] }),
+      );
+      expect(cacheService.bumpNamespaceVersion).toHaveBeenCalledWith('movies:list');
+    });
+
+    it('walks every page of the changes feed', async () => {
+      moviesRepository.find.mockResolvedValue([{ id: 1 }]);
+      tmdbService.fetchChangedMovieIds
+        .mockResolvedValueOnce({ page: 1, results: [], total_pages: 2, total_results: 120 })
+        .mockResolvedValueOnce({
+          page: 2,
+          results: [{ id: 1 }],
+          total_pages: 2,
+          total_results: 120,
+        });
+      tmdbService.fetchMovieDetails.mockResolvedValue(movieDetails(1));
+
+      await expect(service.syncChangedMovies()).resolves.toBe(1);
+      expect(tmdbService.fetchChangedMovieIds).toHaveBeenCalledTimes(2);
+    });
+
+    it('continues when refreshing a single movie fails', async () => {
+      moviesRepository.find.mockResolvedValue([{ id: 1 }, { id: 2 }]);
+      tmdbService.fetchChangedMovieIds.mockResolvedValue({
+        page: 1,
+        results: [{ id: 1 }, { id: 2 }],
+        total_pages: 1,
+        total_results: 2,
+      });
+      tmdbService.fetchMovieDetails
+        .mockRejectedValueOnce(new Error('removed from TMDB'))
+        .mockResolvedValueOnce(movieDetails(2));
+
+      await expect(service.syncChangedMovies()).resolves.toBe(1);
+      expect(moviesRepository.save).toHaveBeenCalledTimes(1);
+    });
+
+    it('leaves caches untouched when nothing relevant changed', async () => {
+      moviesRepository.find.mockResolvedValue([{ id: 1 }]);
+      tmdbService.fetchChangedMovieIds.mockResolvedValue({
+        page: 1,
+        results: [{ id: 999 }],
+        total_pages: 1,
+        total_results: 1,
+      });
+
+      await expect(service.syncChangedMovies()).resolves.toBe(0);
+      expect(cacheService.bumpNamespaceVersion).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('handleIncrementalSync', () => {
+    it('runs the incremental sync', async () => {
+      const syncSpy = jest.spyOn(service, 'syncChangedMovies').mockResolvedValue(3);
+
+      await service.handleIncrementalSync();
+
+      expect(syncSpy).toHaveBeenCalled();
+    });
+
+    it('swallows failures so the scheduler keeps running', async () => {
+      jest.spyOn(service, 'syncChangedMovies').mockRejectedValue(new Error('tmdb down'));
+
+      await expect(service.handleIncrementalSync()).resolves.toBeUndefined();
     });
   });
 

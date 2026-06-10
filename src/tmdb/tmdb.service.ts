@@ -4,9 +4,11 @@ import { ConfigService } from '@nestjs/config';
 import { AxiosError } from 'axios';
 import { firstValueFrom } from 'rxjs';
 import {
+  TmdbChangedMovie,
   TmdbGenre,
   TmdbGenreListResponse,
   TmdbMovie,
+  TmdbMovieDetails,
   TmdbPaginatedResponse,
 } from './interfaces/tmdb.interfaces';
 
@@ -44,6 +46,25 @@ export class TmdbService {
 
   async fetchPopularMovies(page: number): Promise<TmdbPaginatedResponse<TmdbMovie>> {
     return this.request<TmdbPaginatedResponse<TmdbMovie>>('/movie/popular', { page });
+  }
+
+  /**
+   * TMDB's changes feed: ids of movies modified since the given date.
+   * TMDB offers no webhooks, so this feed is the closest thing to a
+   * realtime signal it provides.
+   */
+  async fetchChangedMovieIds(
+    startDate: string,
+    page: number,
+  ): Promise<TmdbPaginatedResponse<TmdbChangedMovie>> {
+    return this.request<TmdbPaginatedResponse<TmdbChangedMovie>>('/movie/changes', {
+      start_date: startDate,
+      page,
+    });
+  }
+
+  async fetchMovieDetails(movieId: number): Promise<TmdbMovieDetails> {
+    return this.request<TmdbMovieDetails>(`/movie/${movieId}`);
   }
 
   /**
