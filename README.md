@@ -55,26 +55,26 @@ A production-ready RESTful API built with **NestJS** that syncs movie data from 
 
 ```mermaid
 flowchart LR
-    Client([Client / Swagger UI])
+    Client(["Client / Swagger UI"])
 
     subgraph Compose["docker-compose"]
         subgraph App["Movies API :8080"]
-            Controllers[Controllers<br/>validation · guards · throttling]
-            Services[Services<br/>business logic]
-            Sync[SyncService<br/>boot · cron · on-demand]
+            Controllers["Controllers<br/>validation, guards, throttling"]
+            Services["Services<br/>business logic"]
+            Sync["SyncService<br/>boot, cron, on-demand"]
             Controllers --> Services
         end
-        PG[(PostgreSQL 16)]
-        RD[(Redis 7)]
+        PG[("PostgreSQL 16")]
+        RD[("Redis 7")]
     end
 
-    TMDB[TMDB API]
+    TMDB["TMDB API"]
 
-    Client -->|HTTP / cookies or bearer| Controllers
-    Services -->|TypeORM| PG
-    Services -->|read-through cache| RD
-    Sync -->|popular + changes feed| TMDB
-    Sync -->|upserts| PG
+    Client -->|"HTTP (cookies or bearer)"| Controllers
+    Services -->|"TypeORM"| PG
+    Services -->|"read-through cache"| RD
+    Sync -->|"popular + changes feed"| TMDB
+    Sync -->|"upserts"| PG
 ```
 
 Requests hit controllers (validation, auth guards, rate limiting), which delegate to services. Read endpoints go through the Redis cache before touching PostgreSQL; rating writes and syncs invalidate affected cache entries. The sync pipeline is the only component that talks to TMDB.
