@@ -4,7 +4,7 @@ A production-ready RESTful API built with **NestJS** that syncs movie data from 
 
 ## Features
 
-- **TMDB sync** — genres and popular movies are upserted on first boot, daily (cron), or on demand via `POST /sync`. Syncs are idempotent, so re-runs and future data additions are safe.
+- **TMDB sync** — genres and popular movies are upserted on first boot, daily (cron), or on demand via `POST /sync`. An incremental job additionally polls TMDB's changes feed every 6 hours and refreshes only tracked movies that actually changed. Syncs are idempotent, so re-runs and future data additions are safe.
 - **Browse movies** — pagination, title search, genre filtering (by name or TMDB id), sorting by popularity, release date, title or average user rating.
 - **Ratings** — authenticated users rate movies 1–10 (create/update/delete); every movie response includes the live average rating and rating count.
 - **Watchlist** — add/remove/list movies per user.
@@ -113,6 +113,7 @@ Each module owns its entities, DTOs, service and controller. Cross-module access
 ## Design Decisions
 
 - **TMDB ids as primary keys** for movies/genres make the sync a plain upsert — no id mapping tables, and re-syncs converge instead of duplicating. Adding more TMDB resources (top-rated, now-playing, TV) is a matter of new fetcher + the same upsert.
+- **Polling, because TMDB has no webhooks.** TMDB offers no push notifications; the closest realtime signal is its changes feed (`/movie/changes`), which lists ids of movies modified in a window. The incremental sync polls that feed, intersects it with locally tracked movies and refreshes only the matches — near-realtime freshness at the cost of a handful of id-only requests, instead of re-downloading whole catalogs. If TMDB ever ships webhooks, `SyncService` is the single integration point.
 - **Average rating in SQL, not application code.** The list endpoint aggregates ratings with a grouped query (and sorts by rating through a subquery), so the work happens where the indexes are.
 - **Cache invalidation by namespace version.** List responses are cached under `movies:list:v{N}:{query}`; a rating write or sync bumps `N` once instead of hunting down every cached query permutation. Movie detail keys are deleted directly.
 - **Indexes where queries actually go**: trigram (pg_trgm) GIN index for `ILIKE` title search, btree indexes on popularity/release date/title for sorting, FK indexes on ratings and the genre join table.
