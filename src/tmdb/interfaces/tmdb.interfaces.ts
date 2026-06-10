@@ -7,7 +7,7 @@ export interface TmdbGenreListResponse {
   genres: TmdbGenre[];
 }
 
-export interface TmdbMovie {
+export interface TmdbMovieBase {
   id: number;
   title: string;
   original_title: string | null;
@@ -19,7 +19,22 @@ export interface TmdbMovie {
   popularity: number;
   vote_average: number;
   vote_count: number;
+}
+
+/** List payloads (e.g. /movie/popular) reference genres by id only. */
+export interface TmdbMovie extends TmdbMovieBase {
   genre_ids: number[];
+}
+
+/** Detail payloads (/movie/{id}) embed full genre objects. */
+export interface TmdbMovieDetails extends TmdbMovieBase {
+  genres: TmdbGenre[];
+}
+
+/** Entry in the /movie/changes feed. */
+export interface TmdbChangedMovie {
+  id: number;
+  adult: boolean | null;
 }
 
 export interface TmdbPaginatedResponse<T> {
