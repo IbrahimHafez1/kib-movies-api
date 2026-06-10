@@ -1,11 +1,15 @@
 import { Body, Controller, HttpCode, HttpStatus, Post, Req, Res, UseGuards } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
+  ApiBadRequestResponse,
   ApiBearerAuth,
+  ApiConflictResponse,
+  ApiCookieAuth,
   ApiCreatedResponse,
   ApiOkResponse,
   ApiOperation,
   ApiTags,
+  ApiTooManyRequestsResponse,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
@@ -21,6 +25,7 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
 const AUTH_THROTTLE = { default: { ttl: 60_000, limit: 10 } };
 
 @ApiTags('auth')
+@ApiTooManyRequestsResponse({ description: 'Auth endpoints allow 10 requests per minute' })
 @Controller('auth')
 export class AuthController {
   private readonly isProduction: boolean;
@@ -36,6 +41,8 @@ export class AuthController {
   @Throttle(AUTH_THROTTLE)
   @ApiOperation({ summary: 'Create an account; sets httpOnly auth cookies' })
   @ApiCreatedResponse({ type: AuthResponseDto })
+  @ApiBadRequestResponse({ description: 'Invalid email or password shorter than 8 characters' })
+  @ApiConflictResponse({ description: 'An account with this email already exists' })
   async register(
     @Body() registerDto: RegisterDto,
     @Res({ passthrough: true }) response: Response,
@@ -77,8 +84,10 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
+  @ApiCookieAuth()
   @ApiOperation({ summary: 'Revoke the refresh token and clear auth cookies' })
   @ApiOkResponse({ description: 'Logged out' })
+  @ApiUnauthorizedResponse({ description: 'Missing or expired credentials' })
   async logout(
     @CurrentUser() user: AuthenticatedUser,
     @Res({ passthrough: true }) response: Response,

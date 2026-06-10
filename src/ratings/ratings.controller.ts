@@ -10,11 +10,15 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import {
+  ApiBadRequestResponse,
   ApiBearerAuth,
+  ApiCookieAuth,
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
+  ApiParam,
   ApiTags,
+  ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AuthenticatedUser, CurrentUser } from '../common/decorators/current-user.decorator';
@@ -24,6 +28,9 @@ import { RatingsService } from './ratings.service';
 
 @ApiTags('ratings')
 @ApiBearerAuth()
+@ApiCookieAuth()
+@ApiUnauthorizedResponse({ description: 'Missing or expired credentials' })
+@ApiParam({ name: 'movieId', description: 'TMDB movie id', example: 603 })
 @UseGuards(JwtAuthGuard)
 @Controller('movies/:movieId/ratings')
 export class RatingsController {
@@ -32,6 +39,7 @@ export class RatingsController {
   @Put()
   @ApiOperation({ summary: 'Rate a movie from 1 to 10 (creates or updates your rating)' })
   @ApiOkResponse({ type: RatingResponseDto })
+  @ApiBadRequestResponse({ description: 'Rating must be an integer between 1 and 10' })
   @ApiNotFoundResponse({ description: 'Movie not found' })
   rateMovie(
     @CurrentUser() user: AuthenticatedUser,

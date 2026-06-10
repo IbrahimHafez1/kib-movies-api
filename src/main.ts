@@ -12,14 +12,49 @@ async function bootstrap(): Promise<void> {
   const swaggerConfig = new DocumentBuilder()
     .setTitle('Movies API')
     .setDescription(
-      'RESTful API that syncs movie data from TMDB and exposes endpoints for browsing, ' +
-        'searching, rating and watchlisting movies.',
+      `RESTful API that syncs movie data from [TMDB](https://www.themoviedb.org/) and lets users browse, search, rate and watchlist movies.
+
+## Authentication
+Call **POST /auth/register** (or **/auth/login**) right from this page — the API sets an httpOnly \`access_token\` cookie and every protected endpoint works from then on. Non-browser clients can instead click **Authorize** and paste the \`accessToken\` returned by register/login as a Bearer token. Access tokens last 15 minutes; rotate them via **POST /auth/refresh**.
+
+## Errors
+Errors use a consistent envelope: \`{ "message": string | string[], "error": string, "statusCode": number }\`. Validation failures return **400** with one message per violated rule.
+
+## Rate limits
+100 requests/minute per client globally; 10 requests/minute on auth endpoints. Exceeding either returns **429**.`,
     )
     .setVersion('1.0')
-    .addBearerAuth()
+    .addBearerAuth({
+      type: 'http',
+      scheme: 'bearer',
+      bearerFormat: 'JWT',
+      description: 'Paste the accessToken returned by /auth/register or /auth/login',
+    })
+    .addCookieAuth('access_token', {
+      type: 'apiKey',
+      in: 'cookie',
+      name: 'access_token',
+      description: 'Set automatically by register/login; nothing to configure',
+    })
+    .addTag('movies', 'Browse, search, filter and sort the movie catalog')
+    .addTag('genres', 'Movie genres synced from TMDB')
+    .addTag('ratings', 'Rate movies 1-10; averages appear on every movie payload')
+    .addTag('watchlist', "Manage the authenticated user's watchlist")
+    .addTag('auth', 'Registration, login, token refresh and logout')
+    .addTag('sync', 'On-demand TMDB synchronization')
+    .addTag('health', 'Liveness and dependency checks')
+    .addTag('root', 'Service metadata')
     .build();
   const document = SwaggerModule.createDocument(app, swaggerConfig);
-  SwaggerModule.setup('docs', app, document);
+  SwaggerModule.setup('docs', app, document, {
+    customSiteTitle: 'Movies API — Documentation',
+    swaggerOptions: {
+      persistAuthorization: true,
+      docExpansion: 'list',
+      defaultModelsExpandDepth: 1,
+      operationsSorter: 'alpha',
+    },
+  });
 
   const configService = app.get(ConfigService);
   warnOnDefaultSecrets(configService);
