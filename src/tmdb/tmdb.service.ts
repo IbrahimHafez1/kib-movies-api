@@ -26,12 +26,20 @@ const HTTP_SERVER_ERROR = 500;
 export class TmdbService {
   private readonly logger = new Logger(TmdbService.name);
   private readonly apiKey: string;
+  /**
+   * TMDB issues two credential types: a 32-char hex "API Key" (v3, sent as
+   * the api_key query param) and a JWT "API Read Access Token" (sent as a
+   * Bearer header — TMDB's preferred method). JWTs contain dots, v3 keys
+   * never do, so either credential can be dropped into TMDB_API_KEY.
+   */
+  private readonly usesBearerToken: boolean;
 
   constructor(
     private readonly httpService: HttpService,
     configService: ConfigService,
   ) {
     this.apiKey = configService.get<string>('tmdb.apiKey', '');
+    this.usesBearerToken = this.apiKey.includes('.');
   }
 
   /** Whether an API key is configured; sync is skipped when it is not. */
@@ -76,7 +84,7 @@ export class TmdbService {
     for (let attempt = 1; ; attempt++) {
       try {
         const response = await firstValueFrom(
-          this.httpService.get<T>(path, { params: { ...params, api_key: this.apiKey } }),
+          this.httpService.get<T>(path, this.requestConfig(params)),
         );
         return response.data;
       } catch (error) {
@@ -93,6 +101,16 @@ export class TmdbService {
         throw new ServiceUnavailableException('TMDB API is unavailable');
       }
     }
+  }
+
+  private requestConfig(params: Record<string, unknown>): {
+    params: Record<string, unknown>;
+    headers?: Record<string, string>;
+  } {
+    if (this.usesBearerToken) {
+      return { params, headers: { Authorization: `Bearer ${this.apiKey}` } };
+    }
+    return { params: { ...params, api_key: this.apiKey } };
   }
 
   private isRetryable(status: number | undefined): boolean {
