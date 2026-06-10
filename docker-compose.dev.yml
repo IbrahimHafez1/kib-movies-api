@@ -1,0 +1,11 @@
+# Development override: exposes Postgres and Redis on the host so the app
+# can run locally with hot reload (npm run start:dev).
+#
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d db redis
+services:
+  db:
+    ports:
+      - '55432:5432'
+  redis:
+    ports:
+      - '56379:6379'
