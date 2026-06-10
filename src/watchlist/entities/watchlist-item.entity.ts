@@ -2,7 +2,6 @@ import {
   Column,
   CreateDateColumn,
   Entity,
-  Index,
   JoinColumn,
   ManyToOne,
   PrimaryGeneratedColumn,
@@ -17,7 +16,7 @@ export class WatchlistItem {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Index()
+  // Lookups by user are covered by the leading column of the unique index.
   @Column({ name: 'user_id' })
   userId: string;
 

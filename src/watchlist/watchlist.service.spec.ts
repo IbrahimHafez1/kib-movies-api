@@ -1,5 +1,5 @@
 import { ConflictException, NotFoundException } from '@nestjs/common';
-import { Repository } from 'typeorm';
+import { QueryFailedError, Repository } from 'typeorm';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { Movie } from '../movies/entities/movie.entity';
 import { MoviesService } from '../movies/movies.service';
@@ -60,6 +60,31 @@ describe('WatchlistService', () => {
 
       await expect(service.add('user-1', 603)).rejects.toBeInstanceOf(ConflictException);
       expect(watchlistRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('reports a conflict when a concurrent request adds the movie first', async () => {
+      watchlistRepository.findOne.mockResolvedValue(null);
+      watchlistRepository.save.mockRejectedValue(
+        new QueryFailedError('INSERT', [], { code: '23505' } as never),
+      );
+
+      await expect(service.add('user-1', 603)).rejects.toBeInstanceOf(ConflictException);
+    });
+
+    it('maps a foreign key violation to NotFound when the movie vanishes mid-request', async () => {
+      watchlistRepository.findOne.mockResolvedValue(null);
+      watchlistRepository.save.mockRejectedValue(
+        new QueryFailedError('INSERT', [], { code: '23503' } as never),
+      );
+
+      await expect(service.add('user-1', 603)).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('rethrows unexpected database errors', async () => {
+      watchlistRepository.findOne.mockResolvedValue(null);
+      watchlistRepository.save.mockRejectedValue(new Error('connection reset'));
+
+      await expect(service.add('user-1', 603)).rejects.toThrow('connection reset');
     });
   });
 

@@ -1,5 +1,5 @@
 import { NotFoundException } from '@nestjs/common';
-import { Repository } from 'typeorm';
+import { QueryFailedError, Repository } from 'typeorm';
 import { Movie } from '../movies/entities/movie.entity';
 import { MoviesService } from '../movies/movies.service';
 import { Rating } from './entities/rating.entity';
@@ -71,6 +71,44 @@ describe('RatingsService', () => {
         NotFoundException,
       );
       expect(ratingsRepository.save).not.toHaveBeenCalled();
+      expect(moviesService.invalidateMovieCaches).not.toHaveBeenCalled();
+    });
+
+    it('recovers when a concurrent request creates the rating first', async () => {
+      // First attempt: no existing row, insert hits the unique constraint.
+      // Retry: the winner's row is found and updated instead.
+      ratingsRepository.findOne
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({ id: 'rating-1', userId: 'user-1', movieId: 603, value: 9 });
+      ratingsRepository.save
+        .mockRejectedValueOnce(new QueryFailedError('INSERT', [], { code: '23505' } as never))
+        .mockImplementationOnce((rating) => ({ updatedAt: new Date(), ...rating }));
+
+      const result = await service.rateMovie('user-1', 603, { value: 4 });
+
+      expect(result.value).toBe(4);
+      expect(ratingsRepository.save).toHaveBeenCalledTimes(2);
+      expect(moviesService.invalidateMovieCaches).toHaveBeenCalledWith(603);
+    });
+
+    it('maps a foreign key violation to NotFound when the movie vanishes mid-request', async () => {
+      ratingsRepository.findOne.mockResolvedValue(null);
+      ratingsRepository.save.mockRejectedValue(
+        new QueryFailedError('INSERT', [], { code: '23503' } as never),
+      );
+
+      await expect(service.rateMovie('user-1', 603, { value: 5 })).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+    });
+
+    it('rethrows unexpected database errors', async () => {
+      ratingsRepository.findOne.mockResolvedValue(null);
+      ratingsRepository.save.mockRejectedValue(new Error('connection reset'));
+
+      await expect(service.rateMovie('user-1', 603, { value: 5 })).rejects.toThrow(
+        'connection reset',
+      );
       expect(moviesService.invalidateMovieCaches).not.toHaveBeenCalled();
     });
   });

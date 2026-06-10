@@ -49,6 +49,21 @@ describe('AppCacheService', () => {
     expect(cacheManager.del).toHaveBeenCalledWith('key');
   });
 
+  describe('ping', () => {
+    it('round-trips a value through the store', async () => {
+      cacheManager.get.mockResolvedValue('ok');
+
+      await expect(service.ping()).resolves.toBe(true);
+      expect(cacheManager.set).toHaveBeenCalledWith('health:ping', 'ok', 5_000);
+    });
+
+    it('reports an unhealthy store', async () => {
+      cacheManager.get.mockResolvedValue(undefined);
+
+      await expect(service.ping()).resolves.toBe(false);
+    });
+  });
+
   describe('namespace versions', () => {
     it('defaults to version 1 when none is stored', async () => {
       cacheManager.get.mockResolvedValue(undefined);
