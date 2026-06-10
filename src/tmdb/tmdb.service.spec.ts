@@ -55,6 +55,18 @@ describe('TmdbService', () => {
     });
   });
 
+  it('sends a JWT read access token as a Bearer header instead of a query param', async () => {
+    const payload = { genres: [] };
+    httpService.get.mockReturnValue(asResponse(payload));
+    const readAccessToken = 'eyJhbGciOiJIUzI1NiJ9.payload.signature';
+
+    await expect(createService(readAccessToken).fetchGenres()).resolves.toEqual([]);
+    expect(httpService.get).toHaveBeenCalledWith('/genre/movie/list', {
+      params: {},
+      headers: { Authorization: `Bearer ${readAccessToken}` },
+    });
+  });
+
   it('fetches the changes feed for a date window', async () => {
     const payload = {
       page: 1,
