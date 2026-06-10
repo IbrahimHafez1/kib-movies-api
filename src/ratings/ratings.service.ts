@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { isForeignKeyViolation, isUniqueViolation } from '../common/database-errors';
 import { Movie } from '../movies/entities/movie.entity';
 import { MoviesService } from '../movies/movies.service';
 import { RateMovieDto } from './dto/rate-movie.dto';
@@ -23,11 +24,20 @@ export class RatingsService {
   ): Promise<RatingResponseDto> {
     await this.ensureMovieExists(movieId);
 
-    const existing = await this.ratingsRepository.findOne({ where: { userId, movieId } });
-    const rating = existing
-      ? { ...existing, value: rateMovieDto.value }
-      : this.ratingsRepository.create({ userId, movieId, value: rateMovieDto.value });
-    const saved = await this.ratingsRepository.save(rating);
+    let saved: Rating;
+    try {
+      saved = await this.upsertRating(userId, movieId, rateMovieDto.value);
+    } catch (error) {
+      if (isUniqueViolation(error)) {
+        // Two concurrent first-time ratings raced; the loser retries as an update.
+        saved = await this.upsertRating(userId, movieId, rateMovieDto.value);
+      } else if (isForeignKeyViolation(error)) {
+        // Movie was deleted between the existence check and the insert.
+        throw new NotFoundException(`Movie ${movieId} not found`);
+      } else {
+        throw error;
+      }
+    }
 
     await this.moviesService.invalidateMovieCaches(movieId);
     return RatingResponseDto.fromEntity(saved);
@@ -39,6 +49,14 @@ export class RatingsService {
       throw new NotFoundException(`No rating by this user for movie ${movieId}`);
     }
     await this.moviesService.invalidateMovieCaches(movieId);
+  }
+
+  private async upsertRating(userId: string, movieId: number, value: number): Promise<Rating> {
+    const existing = await this.ratingsRepository.findOne({ where: { userId, movieId } });
+    const rating = existing
+      ? { ...existing, value }
+      : this.ratingsRepository.create({ userId, movieId, value });
+    return this.ratingsRepository.save(rating);
   }
 
   private async ensureMovieExists(movieId: number): Promise<void> {

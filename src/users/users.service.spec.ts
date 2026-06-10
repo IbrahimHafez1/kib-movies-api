@@ -1,5 +1,5 @@
 import { ConflictException } from '@nestjs/common';
-import { Repository } from 'typeorm';
+import { QueryFailedError, Repository } from 'typeorm';
 import { User } from './entities/user.entity';
 import { UsersService } from './users.service';
 
@@ -39,6 +39,24 @@ describe('UsersService', () => {
         ConflictException,
       );
       expect(usersRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('reports a conflict when a concurrent registration wins the race', async () => {
+      usersRepository.findOne.mockResolvedValue(null);
+      usersRepository.save.mockRejectedValue(
+        new QueryFailedError('INSERT', [], { code: '23505' } as never),
+      );
+
+      await expect(service.create('jane@example.com', 'hash')).rejects.toBeInstanceOf(
+        ConflictException,
+      );
+    });
+
+    it('rethrows unexpected database errors', async () => {
+      usersRepository.findOne.mockResolvedValue(null);
+      usersRepository.save.mockRejectedValue(new Error('connection reset'));
+
+      await expect(service.create('jane@example.com', 'hash')).rejects.toThrow('connection reset');
     });
   });
 

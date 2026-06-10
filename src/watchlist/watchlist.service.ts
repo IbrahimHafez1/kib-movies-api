@@ -1,6 +1,7 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { isForeignKeyViolation, isUniqueViolation } from '../common/database-errors';
 import { PaginatedResponseDto } from '../common/dto/paginated-response.dto';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { Movie } from '../movies/entities/movie.entity';
@@ -31,9 +32,21 @@ export class WatchlistService {
       throw new ConflictException('Movie is already in your watchlist');
     }
 
-    const item = await this.watchlistRepository.save(
-      this.watchlistRepository.create({ userId, movieId }),
-    );
+    let item: WatchlistItem;
+    try {
+      item = await this.watchlistRepository.save(
+        this.watchlistRepository.create({ userId, movieId }),
+      );
+    } catch (error) {
+      if (isUniqueViolation(error)) {
+        // A concurrent request won the race; report it like any other duplicate.
+        throw new ConflictException('Movie is already in your watchlist');
+      }
+      if (isForeignKeyViolation(error)) {
+        throw new NotFoundException(`Movie ${movieId} not found`);
+      }
+      throw error;
+    }
     item.movie = movie;
     const stats = await this.moviesService.getRatingStats([movieId]);
     return WatchlistItemResponseDto.fromEntity(item, stats.get(movieId));

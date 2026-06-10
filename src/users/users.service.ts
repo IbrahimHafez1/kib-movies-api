@@ -1,6 +1,7 @@
 import { ConflictException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { isUniqueViolation } from '../common/database-errors';
 import { User } from './entities/user.entity';
 
 @Injectable()
@@ -12,8 +13,15 @@ export class UsersService {
     if (existing) {
       throw new ConflictException('An account with this email already exists');
     }
-    const user = this.usersRepository.create({ email, passwordHash });
-    return this.usersRepository.save(user);
+    try {
+      return await this.usersRepository.save(this.usersRepository.create({ email, passwordHash }));
+    } catch (error) {
+      if (isUniqueViolation(error)) {
+        // Concurrent registration with the same email won the race.
+        throw new ConflictException('An account with this email already exists');
+      }
+      throw error;
+    }
   }
 
   findByEmail(email: string): Promise<User | null> {
