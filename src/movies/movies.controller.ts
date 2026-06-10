@@ -1,5 +1,6 @@
 import { Controller, Get, Param, ParseIntPipe, Query } from '@nestjs/common';
 import { ApiNotFoundResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiPaginatedResponse } from '../common/decorators/api-paginated-response.decorator';
 import { PaginatedResponseDto } from '../common/dto/paginated-response.dto';
 import { ListMoviesQueryDto } from './dto/list-movies-query.dto';
 import { MovieResponseDto } from './dto/movie-response.dto';
@@ -18,7 +19,7 @@ export class MoviesController {
       'or TMDB genre id (?genre=28), search by title (?search=batman), sort by popularity, ' +
       'release date, title or average rating.',
   })
-  @ApiOkResponse({ type: PaginatedResponseDto<MovieResponseDto> })
+  @ApiPaginatedResponse(MovieResponseDto)
   findAll(@Query() query: ListMoviesQueryDto): Promise<PaginatedResponseDto<MovieResponseDto>> {
     return this.moviesService.findAll(query);
   }

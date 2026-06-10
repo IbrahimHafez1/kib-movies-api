@@ -15,11 +15,11 @@ import {
   ApiConflictResponse,
   ApiCreatedResponse,
   ApiNotFoundResponse,
-  ApiOkResponse,
   ApiOperation,
   ApiTags,
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { ApiPaginatedResponse } from '../common/decorators/api-paginated-response.decorator';
 import { AuthenticatedUser, CurrentUser } from '../common/decorators/current-user.decorator';
 import { PaginatedResponseDto } from '../common/dto/paginated-response.dto';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
@@ -35,7 +35,7 @@ export class WatchlistController {
 
   @Get()
   @ApiOperation({ summary: "List the authenticated user's watchlist" })
-  @ApiOkResponse({ type: PaginatedResponseDto<WatchlistItemResponseDto> })
+  @ApiPaginatedResponse(WatchlistItemResponseDto)
   list(
     @CurrentUser() user: AuthenticatedUser,
     @Query() query: PaginationQueryDto,

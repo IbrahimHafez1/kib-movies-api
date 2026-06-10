@@ -17,6 +17,9 @@ export class MovieResponseDto {
   title: string;
 
   @ApiProperty({ nullable: true, type: String })
+  originalTitle: string | null;
+
+  @ApiProperty({ nullable: true, type: String })
   overview: string | null;
 
   @ApiProperty({ nullable: true, type: String })
@@ -24,6 +27,9 @@ export class MovieResponseDto {
 
   @ApiProperty({ nullable: true, type: String })
   posterPath: string | null;
+
+  @ApiProperty({ nullable: true, type: String })
+  backdropPath: string | null;
 
   @ApiProperty({ nullable: true, type: String })
   originalLanguage: string | null;
@@ -50,9 +56,11 @@ export class MovieResponseDto {
     return {
       id: movie.id,
       title: movie.title,
+      originalTitle: movie.originalTitle,
       overview: movie.overview,
       releaseDate: movie.releaseDate,
       posterPath: movie.posterPath,
+      backdropPath: movie.backdropPath,
       originalLanguage: movie.originalLanguage,
       popularity: movie.popularity,
       tmdbVoteAverage: movie.tmdbVoteAverage,
