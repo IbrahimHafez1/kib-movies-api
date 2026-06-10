@@ -146,6 +146,19 @@ describe('AuthService', () => {
     });
   });
 
+  it('issues unique refresh tokens even within the same second', async () => {
+    usersService.findByEmail.mockResolvedValue(user);
+
+    const [first, second] = await Promise.all([
+      service.login({ email: user.email, password: 'password123' }),
+      service.login({ email: user.email, password: 'password123' }),
+    ]);
+
+    // Identical sub + iat must not produce identical tokens, or rotation
+    // and revocation would silently stop working.
+    expect(first.refreshToken).not.toBe(second.refreshToken);
+  });
+
   it('logout clears the stored refresh token hash', async () => {
     await service.logout('user-1');
 

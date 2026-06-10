@@ -2,7 +2,7 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
-import { createHash, timingSafeEqual } from 'crypto';
+import { createHash, randomUUID, timingSafeEqual } from 'crypto';
 import { User } from '../users/entities/user.entity';
 import { UsersService } from '../users/users.service';
 import { LoginDto } from './dto/login.dto';
@@ -92,8 +92,11 @@ export class AuthService {
         { sub: user.id, email: user.email },
         { secret: this.accessSecret, expiresIn: this.accessExpiresIn },
       ),
+      // jti makes every refresh token unique: JWT iat has one-second
+      // precision, so without it two tokens issued in the same second would
+      // be byte-identical and rotation would silently become a no-op.
       this.jwtService.signAsync(
-        { sub: user.id },
+        { sub: user.id, jti: randomUUID() },
         { secret: this.refreshSecret, expiresIn: this.refreshExpiresIn },
       ),
     ]);
