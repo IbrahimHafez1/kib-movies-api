@@ -1,0 +1,189 @@
+import { ConfigService } from '@nestjs/config';
+import { Repository } from 'typeorm';
+import { AppCacheService } from '../cache/app-cache.service';
+import { Genre } from '../genres/entities/genre.entity';
+import { Movie } from '../movies/entities/movie.entity';
+import { TmdbMovie } from '../tmdb/interfaces/tmdb.interfaces';
+import { TmdbService } from '../tmdb/tmdb.service';
+import { SyncService } from './sync.service';
+
+const tmdbMovie = (id: number, overrides: Partial<TmdbMovie> = {}): TmdbMovie => ({
+  id,
+  title: `Movie ${id}`,
+  original_title: `Movie ${id}`,
+  overview: 'Overview',
+  release_date: '2020-01-01',
+  poster_path: '/poster.jpg',
+  backdrop_path: '/backdrop.jpg',
+  original_language: 'en',
+  popularity: 10,
+  vote_average: 7.5,
+  vote_count: 100,
+  genre_ids: [28],
+  ...overrides,
+});
+
+describe('SyncService', () => {
+  let tmdbService: { isConfigured: boolean; fetchGenres: jest.Mock; fetchPopularMovies: jest.Mock };
+  let genresRepository: { save: jest.Mock; create: jest.Mock; findBy: jest.Mock };
+  let moviesRepository: { save: jest.Mock; create: jest.Mock; count: jest.Mock };
+  let cacheService: { del: jest.Mock; bumpNamespaceVersion: jest.Mock };
+  let service: SyncService;
+
+  const createService = (syncPages = 2): SyncService => {
+    const configService = {
+      getOrThrow: jest.fn().mockReturnValue(syncPages),
+    } as unknown as ConfigService;
+    return new SyncService(
+      tmdbService as unknown as TmdbService,
+      genresRepository as unknown as Repository<Genre>,
+      moviesRepository as unknown as Repository<Movie>,
+      cacheService as unknown as AppCacheService,
+      configService,
+    );
+  };
+
+  beforeEach(() => {
+    tmdbService = {
+      isConfigured: true,
+      fetchGenres: jest.fn().mockResolvedValue([{ id: 28, name: 'Action' }]),
+      fetchPopularMovies: jest.fn(),
+    };
+    genresRepository = {
+      save: jest.fn(),
+      create: jest.fn((genre) => genre),
+      findBy: jest.fn().mockResolvedValue([{ id: 28, name: 'Action' }]),
+    };
+    moviesRepository = {
+      save: jest.fn(),
+      create: jest.fn((movie) => movie),
+      count: jest.fn(),
+    };
+    cacheService = { del: jest.fn(), bumpNamespaceVersion: jest.fn() };
+    service = createService();
+  });
+
+  describe('syncAll', () => {
+    it('skips entirely when no TMDB key is configured', async () => {
+      tmdbService.isConfigured = false;
+
+      await expect(service.syncAll()).resolves.toEqual({ genres: 0, movies: 0 });
+      expect(tmdbService.fetchGenres).not.toHaveBeenCalled();
+    });
+
+    it('syncs genres and the configured number of movie pages', async () => {
+      tmdbService.fetchPopularMovies.mockResolvedValue({
+        page: 1,
+        results: [tmdbMovie(1), tmdbMovie(2)],
+        total_pages: 50,
+        total_results: 1000,
+      });
+
+      await expect(service.syncAll()).resolves.toEqual({ genres: 1, movies: 4 });
+      expect(tmdbService.fetchPopularMovies).toHaveBeenCalledTimes(2);
+      expect(genresRepository.save).toHaveBeenCalled();
+      expect(moviesRepository.save).toHaveBeenCalledTimes(2);
+    });
+
+    it('invalidates cached genre and movie reads after syncing', async () => {
+      tmdbService.fetchPopularMovies.mockResolvedValue({
+        page: 1,
+        results: [tmdbMovie(1)],
+        total_pages: 1,
+        total_results: 1,
+      });
+
+      await service.syncAll();
+
+      expect(cacheService.del).toHaveBeenCalledWith('genres:all');
+      expect(cacheService.bumpNamespaceVersion).toHaveBeenCalledWith('movies:list');
+    });
+
+    it('maps TMDB payloads onto entities, attaching known genres', async () => {
+      tmdbService.fetchPopularMovies.mockResolvedValue({
+        page: 1,
+        results: [tmdbMovie(1, { genre_ids: [28, 999] })],
+        total_pages: 1,
+        total_results: 1,
+      });
+
+      await service.syncAll();
+
+      const savedMovies = moviesRepository.save.mock.calls[0][0];
+      expect(savedMovies[0]).toMatchObject({
+        id: 1,
+        title: 'Movie 1',
+        tmdbVoteAverage: 7.5,
+        genres: [{ id: 28, name: 'Action' }],
+      });
+    });
+
+    it('stops paging when TMDB has fewer pages than configured', async () => {
+      tmdbService.fetchPopularMovies.mockResolvedValue({
+        page: 1,
+        results: [tmdbMovie(1)],
+        total_pages: 1,
+        total_results: 1,
+      });
+
+      await service.syncAll();
+
+      expect(tmdbService.fetchPopularMovies).toHaveBeenCalledTimes(1);
+    });
+
+    it('handles an empty results page', async () => {
+      tmdbService.fetchPopularMovies.mockResolvedValue({
+        page: 1,
+        results: [],
+        total_pages: 1,
+        total_results: 0,
+      });
+
+      await expect(service.syncAll()).resolves.toEqual({ genres: 1, movies: 0 });
+      expect(moviesRepository.save).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('onApplicationBootstrap', () => {
+    it('skips the initial sync when movies already exist', async () => {
+      moviesRepository.count.mockResolvedValue(42);
+      const syncSpy = jest.spyOn(service, 'syncAll');
+
+      await service.onApplicationBootstrap();
+
+      expect(syncSpy).not.toHaveBeenCalled();
+    });
+
+    it('triggers a sync when the database is empty', async () => {
+      moviesRepository.count.mockResolvedValue(0);
+      const syncSpy = jest.spyOn(service, 'syncAll').mockResolvedValue({ genres: 0, movies: 0 });
+
+      await service.onApplicationBootstrap();
+
+      expect(syncSpy).toHaveBeenCalled();
+    });
+
+    it('logs instead of crashing when the initial sync fails', async () => {
+      moviesRepository.count.mockResolvedValue(0);
+      jest.spyOn(service, 'syncAll').mockRejectedValue(new Error('tmdb down'));
+
+      await expect(service.onApplicationBootstrap()).resolves.toBeUndefined();
+    });
+  });
+
+  describe('handleScheduledSync', () => {
+    it('runs a full sync', async () => {
+      const syncSpy = jest.spyOn(service, 'syncAll').mockResolvedValue({ genres: 1, movies: 2 });
+
+      await service.handleScheduledSync();
+
+      expect(syncSpy).toHaveBeenCalled();
+    });
+
+    it('swallows sync failures so the scheduler keeps running', async () => {
+      jest.spyOn(service, 'syncAll').mockRejectedValue(new Error('tmdb down'));
+
+      await expect(service.handleScheduledSync()).resolves.toBeUndefined();
+    });
+  });
+});
