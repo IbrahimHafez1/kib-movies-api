@@ -13,10 +13,13 @@ import {
 import {
   ApiBearerAuth,
   ApiConflictResponse,
+  ApiCookieAuth,
   ApiCreatedResponse,
   ApiNotFoundResponse,
   ApiOperation,
+  ApiParam,
   ApiTags,
+  ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ApiPaginatedResponse } from '../common/decorators/api-paginated-response.decorator';
@@ -28,6 +31,8 @@ import { WatchlistService } from './watchlist.service';
 
 @ApiTags('watchlist')
 @ApiBearerAuth()
+@ApiCookieAuth()
+@ApiUnauthorizedResponse({ description: 'Missing or expired credentials' })
 @UseGuards(JwtAuthGuard)
 @Controller('watchlist')
 export class WatchlistController {
@@ -45,6 +50,7 @@ export class WatchlistController {
 
   @Post(':movieId')
   @ApiOperation({ summary: 'Add a movie to the watchlist' })
+  @ApiParam({ name: 'movieId', description: 'TMDB movie id', example: 603 })
   @ApiCreatedResponse({ type: WatchlistItemResponseDto })
   @ApiNotFoundResponse({ description: 'Movie not found' })
   @ApiConflictResponse({ description: 'Movie already in watchlist' })
@@ -58,6 +64,7 @@ export class WatchlistController {
   @Delete(':movieId')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Remove a movie from the watchlist' })
+  @ApiParam({ name: 'movieId', description: 'TMDB movie id', example: 603 })
   @ApiNotFoundResponse({ description: 'Movie not in watchlist' })
   remove(
     @CurrentUser() user: AuthenticatedUser,

@@ -2,6 +2,7 @@ import { Controller, Get, ServiceUnavailableException } from '@nestjs/common';
 import {
   ApiOkResponse,
   ApiOperation,
+  ApiProperty,
   ApiServiceUnavailableResponse,
   ApiTags,
 } from '@nestjs/swagger';
@@ -9,10 +10,17 @@ import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { AppCacheService } from '../cache/app-cache.service';
 
-export interface HealthStatus {
+export class HealthResponseDto {
+  @ApiProperty({ example: 'ok' })
   status: 'ok';
+
+  @ApiProperty({ example: 'up', description: 'PostgreSQL connectivity' })
   database: 'up';
+
+  @ApiProperty({ example: 'up', description: 'Redis connectivity' })
   cache: 'up';
+
+  @ApiProperty({ example: 1234 })
   uptimeSeconds: number;
 }
 
@@ -26,9 +34,12 @@ export class HealthController {
 
   @Get()
   @ApiOperation({ summary: 'Liveness check covering the database and cache' })
-  @ApiOkResponse({ description: 'Service, database and cache are healthy' })
+  @ApiOkResponse({
+    type: HealthResponseDto,
+    description: 'Service, database and cache are healthy',
+  })
   @ApiServiceUnavailableResponse({ description: 'A dependency is unreachable' })
-  async check(): Promise<HealthStatus> {
+  async check(): Promise<HealthResponseDto> {
     try {
       await this.dataSource.query('SELECT 1');
     } catch {
