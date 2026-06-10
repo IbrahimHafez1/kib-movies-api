@@ -138,7 +138,7 @@ All settings come from environment variables (see `.env.example`):
 | `DB_HOST` / `DB_PORT` / `DB_USERNAME` / `DB_PASSWORD` / `DB_NAME` | `localhost` / `5432` / `postgres` / `postgres` / `movies` | PostgreSQL connection |
 | `REDIS_HOST` / `REDIS_PORT` | `localhost` / `6379` | Redis connection |
 | `CACHE_TTL_MS` | `60000` | TTL for cached read responses |
-| `TMDB_API_KEY` | _(empty)_ | TMDB v3 API key; sync is skipped (with a warning) when unset |
+| `TMDB_API_KEY` | _(empty)_ | Either the TMDB v3 "API Key" or the JWT "API Read Access Token" — the client auto-detects which and authenticates per TMDB's docs. Sync is skipped (with a warning) when unset |
 | `TMDB_BASE_URL` | `https://api.themoviedb.org/3` | TMDB API base URL |
 | `TMDB_SYNC_PAGES` | `5` | Popular-movie pages to sync (20 movies per page) |
 | `JWT_ACCESS_SECRET` / `JWT_REFRESH_SECRET` | dev defaults | Token signing secrets — set real values in production |
