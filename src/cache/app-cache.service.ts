@@ -39,6 +39,13 @@ export class AppCacheService {
     await this.cacheManager.set(this.versionKey(namespace), current + 1, 0);
   }
 
+  /** Round-trips a value through the store; used by the health check. */
+  async ping(): Promise<boolean> {
+    const PING_TTL_MS = 5_000;
+    await this.cacheManager.set('health:ping', 'ok', PING_TTL_MS);
+    return (await this.cacheManager.get('health:ping')) === 'ok';
+  }
+
   private versionKey(namespace: string): string {
     return `${namespace}:version`;
   }
