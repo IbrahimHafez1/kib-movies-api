@@ -31,9 +31,6 @@ export class InitialSchema1781088738118 implements MigrationInterface {
       `CREATE TABLE "watchlist_items" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "user_id" uuid NOT NULL, "movie_id" integer NOT NULL, "created_at" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "UQ_a6a48319d1810e2600cfad7b8ce" UNIQUE ("user_id", "movie_id"), CONSTRAINT "PK_0a02323c5cc02e094871f24062b" PRIMARY KEY ("id"))`,
     );
     await queryRunner.query(
-      `CREATE INDEX "IDX_0072d2b5c5969c239be193df14" ON "watchlist_items" ("user_id") `,
-    );
-    await queryRunner.query(
       `CREATE TABLE "ratings" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "user_id" uuid NOT NULL, "movie_id" integer NOT NULL, "value" integer NOT NULL, "created_at" TIMESTAMP NOT NULL DEFAULT now(), "updated_at" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "UQ_969fcc2afb64c8a81f487f60afa" UNIQUE ("user_id", "movie_id"), CONSTRAINT "PK_0f31425b073219379545ad68ed9" PRIMARY KEY ("id"))`,
     );
     await queryRunner.query(
@@ -92,7 +89,6 @@ export class InitialSchema1781088738118 implements MigrationInterface {
     await queryRunner.query(`DROP TABLE "movie_genres"`);
     await queryRunner.query(`DROP INDEX "public"."IDX_45c7bafa4e537191add4eeed5b"`);
     await queryRunner.query(`DROP TABLE "ratings"`);
-    await queryRunner.query(`DROP INDEX "public"."IDX_0072d2b5c5969c239be193df14"`);
     await queryRunner.query(`DROP TABLE "watchlist_items"`);
     await queryRunner.query(`DROP INDEX "public"."IDX_movies_title_trgm"`);
     await queryRunner.query(`DROP INDEX "public"."IDX_48d8ba656012a2c2b94fa05f88"`);
