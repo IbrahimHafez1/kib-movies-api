@@ -12,10 +12,19 @@ describe('TmdbService', () => {
     const configService = {
       get: jest.fn().mockReturnValue(apiKey),
     } as unknown as ConfigService;
-    return new TmdbService(httpService as unknown as HttpService, configService);
+    const service = new TmdbService(httpService as unknown as HttpService, configService);
+    // Backoff delays are irrelevant to behaviour under test.
+    jest.spyOn(service as never, 'sleep').mockResolvedValue(undefined as never);
+    return service;
   };
 
   const asResponse = <T>(data: T) => of({ data } as AxiosResponse<T>);
+
+  const axiosErrorWithStatus = (status: number): AxiosError => {
+    const error = new AxiosError('Request failed');
+    error.response = { status } as AxiosResponse;
+    return error;
+  };
 
   beforeEach(() => {
     httpService = { get: jest.fn() };
@@ -46,19 +55,42 @@ describe('TmdbService', () => {
     });
   });
 
-  it('translates HTTP failures into a ServiceUnavailableException', async () => {
-    httpService.get.mockReturnValue(throwError(() => new AxiosError('Request failed', '500')));
+  it('retries transient server errors and succeeds', async () => {
+    const payload = { page: 1, results: [], total_pages: 1, total_results: 0 };
+    httpService.get
+      .mockReturnValueOnce(throwError(() => axiosErrorWithStatus(503)))
+      .mockReturnValueOnce(throwError(() => new Error('socket hang up')))
+      .mockReturnValueOnce(asResponse(payload));
+
+    await expect(createService('key').fetchPopularMovies(1)).resolves.toEqual(payload);
+    expect(httpService.get).toHaveBeenCalledTimes(3);
+  });
+
+  it('gives up after exhausting retries', async () => {
+    httpService.get.mockReturnValue(throwError(() => axiosErrorWithStatus(500)));
 
     await expect(createService('key').fetchGenres()).rejects.toBeInstanceOf(
       ServiceUnavailableException,
     );
+    expect(httpService.get).toHaveBeenCalledTimes(3);
   });
 
-  it('handles non-axios errors the same way', async () => {
-    httpService.get.mockReturnValue(throwError(() => new Error('socket hang up')));
+  it('does not retry client errors such as an invalid API key', async () => {
+    httpService.get.mockReturnValue(throwError(() => axiosErrorWithStatus(401)));
 
-    await expect(createService('key').fetchPopularMovies(1)).rejects.toBeInstanceOf(
+    await expect(createService('bad-key').fetchGenres()).rejects.toBeInstanceOf(
       ServiceUnavailableException,
     );
+    expect(httpService.get).toHaveBeenCalledTimes(1);
+  });
+
+  it('retries rate-limit responses', async () => {
+    const payload = { genres: [] };
+    httpService.get
+      .mockReturnValueOnce(throwError(() => axiosErrorWithStatus(429)))
+      .mockReturnValueOnce(asResponse(payload));
+
+    await expect(createService('key').fetchGenres()).resolves.toEqual([]);
+    expect(httpService.get).toHaveBeenCalledTimes(2);
   });
 });

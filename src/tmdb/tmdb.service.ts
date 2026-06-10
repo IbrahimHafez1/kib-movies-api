@@ -10,6 +10,11 @@ import {
   TmdbPaginatedResponse,
 } from './interfaces/tmdb.interfaces';
 
+const MAX_ATTEMPTS = 3;
+const RETRY_BASE_DELAY_MS = 500;
+const HTTP_TOO_MANY_REQUESTS = 429;
+const HTTP_SERVER_ERROR = 500;
+
 /**
  * Thin, typed client around the TMDB v3 REST API.
  * All TMDB knowledge (endpoints, auth, payload shapes) lives here so the
@@ -41,16 +46,39 @@ export class TmdbService {
     return this.request<TmdbPaginatedResponse<TmdbMovie>>('/movie/popular', { page });
   }
 
+  /**
+   * Performs a GET with retries on transient failures (network errors,
+   * 5xx, 429) using exponential backoff. Client errors fail immediately:
+   * retrying a bad API key will never succeed.
+   */
   private async request<T>(path: string, params: Record<string, unknown> = {}): Promise<T> {
-    try {
-      const response = await firstValueFrom(
-        this.httpService.get<T>(path, { params: { ...params, api_key: this.apiKey } }),
-      );
-      return response.data;
-    } catch (error) {
-      const status = error instanceof AxiosError ? error.response?.status : undefined;
-      this.logger.error(`TMDB request failed: GET ${path} (status: ${status ?? 'unknown'})`);
-      throw new ServiceUnavailableException('TMDB API is unavailable');
+    for (let attempt = 1; ; attempt++) {
+      try {
+        const response = await firstValueFrom(
+          this.httpService.get<T>(path, { params: { ...params, api_key: this.apiKey } }),
+        );
+        return response.data;
+      } catch (error) {
+        const status = error instanceof AxiosError ? error.response?.status : undefined;
+        if (this.isRetryable(status) && attempt < MAX_ATTEMPTS) {
+          this.logger.warn(
+            `TMDB request failed (status: ${status ?? 'network error'}); ` +
+              `retrying GET ${path} (attempt ${attempt + 1}/${MAX_ATTEMPTS})`,
+          );
+          await this.sleep(RETRY_BASE_DELAY_MS * 2 ** (attempt - 1));
+          continue;
+        }
+        this.logger.error(`TMDB request failed: GET ${path} (status: ${status ?? 'unknown'})`);
+        throw new ServiceUnavailableException('TMDB API is unavailable');
+      }
     }
+  }
+
+  private isRetryable(status: number | undefined): boolean {
+    return status === undefined || status === HTTP_TOO_MANY_REQUESTS || status >= HTTP_SERVER_ERROR;
+  }
+
+  private sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 }
