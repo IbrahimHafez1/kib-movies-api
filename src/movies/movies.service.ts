@@ -135,7 +135,7 @@ export class MoviesService {
       await this.ratingsRepository
         .createQueryBuilder('rating')
         .select('rating.movieId', 'movieId')
-        .addSelect('AVG(rating.value)', 'average')
+        .addSelect('COALESCE(AVG(rating.value), 0)', 'average')
         .addSelect('COUNT(*)', 'count')
         .where('rating.movieId IN (:...movieIds)', { movieIds })
         .groupBy('rating.movieId')
