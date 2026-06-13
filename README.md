@@ -17,6 +17,7 @@ A production-ready RESTful API built with **NestJS** that syncs movie data from 
 - [Quick Start](#quick-start)
 - [API Overview](#api-overview)
 - [Authentication Flow](#authentication-flow)
+- [Security](#security)
 - [Data Model](#data-model)
 - [TMDB Sync Strategy](#tmdb-sync-strategy)
 - [Project Structure](#project-structure)
@@ -27,6 +28,7 @@ A production-ready RESTful API built with **NestJS** that syncs movie data from 
 - [Testing](#testing)
 - [Database Migrations](#database-migrations)
 - [Troubleshooting](#troubleshooting)
+- [License](#license)
 
 ## Features
 
@@ -191,9 +193,24 @@ sequenceDiagram
     A-->>C: 200 (refresh token revoked server-side, cookies cleared)
 ```
 
-- Tokens live in **httpOnly cookies**, so page scripts can never read them (XSS-safe); `SameSite=Lax` blunts CSRF, and the refresh cookie is scoped to `/auth` only.
+- Tokens live in **httpOnly cookies**, so page scripts can never read them (XSS-safe); they are marked `Secure` (HTTPS-only, outside the test runner), `SameSite=Lax` blunts CSRF, and the refresh cookie is scoped to `/auth` only.
 - **Refresh tokens rotate**: each one works exactly once, carries a unique `jti`, and only its SHA-256 hash is stored — a leaked database exposes nothing replayable.
 - Non-browser clients can ignore cookies entirely and send `Authorization: Bearer <accessToken>`.
+
+## Security
+
+Securing the API is listed as a nice-to-have in the challenge; here is the consolidated picture, all enforced in code.
+
+| Area | Measure |
+| ---- | ------- |
+| **Authentication** | JWT access (15 min) + rotating refresh (7 days) tokens as `httpOnly` + `Secure` + `SameSite=Lax` cookies; `Authorization: Bearer` accepted for non-browser clients |
+| **Token theft** | Refresh tokens are single-use with a unique `jti`, stored only as a SHA-256 hash, and revoked server-side on logout — a database leak exposes nothing replayable |
+| **Passwords** | bcrypt-hashed; login returns a generic "invalid email or password" so accounts can't be enumerated |
+| **Rate limiting** | 100 requests/min per client globally, 10/min on auth endpoints (429 on exceed) — makes credential stuffing impractical |
+| **Input validation** | Global whitelist `ValidationPipe` forbids unknown fields, so mass-assignment payloads like `{"isAdmin": true}` are rejected with 400 |
+| **HTTP hardening** | helmet security headers; CORS restricted to configured origins (`CORS_ORIGIN`), with credentials shared only with those origins |
+| **Concurrency** | Unique constraints are the source of truth for races; violations become 409/404, never 500 |
+| **Secrets & runtime** | Secrets only via env vars; the app refuses to boot in production with default JWT secrets; container runs as a non-root user; Postgres and Redis are unreachable from outside the compose network |
 
 ## Data Model
 
@@ -355,3 +372,7 @@ npm run migration:revert
 | e2e tests fail with `ECONNREFUSED` | Start the dev services first: `docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d db redis` |
 | Want a completely fresh database | `docker compose down -v && docker compose up` (the `-v` drops the Postgres volume) |
 | Sync logs `TMDB request failed (status: 401)` | The TMDB credential is wrong/expired — regenerate it at themoviedb.org → Settings → API |
+
+## License
+
+Released under the [MIT License](LICENSE).
