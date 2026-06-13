@@ -28,6 +28,10 @@ export class EnvironmentVariables {
 
   @IsOptional()
   @IsString()
+  CORS_ORIGIN?: string;
+
+  @IsOptional()
+  @IsString()
   REDIS_HOST?: string;
 
   @IsOptional()

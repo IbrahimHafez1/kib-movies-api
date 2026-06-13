@@ -9,7 +9,14 @@ import helmet from 'helmet';
 export function configureApp(app: INestApplication): INestApplication {
   app.use(helmet());
   app.use(cookieParser());
-  app.enableCors();
+  // Lock CORS to explicit origins (with cookies) when CORS_ORIGIN is set; otherwise
+  // reflect any origin but never share credentials, so the zero-config demo still works.
+  const corsOrigin = process.env.CORS_ORIGIN;
+  app.enableCors(
+    corsOrigin
+      ? { origin: corsOrigin.split(',').map((origin) => origin.trim()), credentials: true }
+      : { origin: true },
+  );
   app.enableShutdownHooks();
   app.useGlobalPipes(
     new ValidationPipe({
