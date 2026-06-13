@@ -18,8 +18,10 @@ services:
       TMDB_API_KEY: ${TMDB_API_KEY:-}
       TMDB_BASE_URL: ${TMDB_BASE_URL:-https://api.themoviedb.org/3}
       TMDB_SYNC_PAGES: ${TMDB_SYNC_PAGES:-5}
-      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:-change-me-in-production}
-      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-change-me-too-in-production}
+      # Demo defaults so `docker-compose up` works with zero config; override with real
+      # secrets in any real deployment (the app refuses to boot on the change-me placeholders).
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:-local-demo-access-secret-not-for-production}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-local-demo-refresh-secret-not-for-production}
     depends_on:
       db:
         condition: service_healthy
