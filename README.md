@@ -298,11 +298,12 @@ All settings come from environment variables (see `.env.example`):
 | `PORT` | `8080` | HTTP port |
 | `DB_HOST` / `DB_PORT` / `DB_USERNAME` / `DB_PASSWORD` / `DB_NAME` | `localhost` / `5432` / `postgres` / `postgres` / `movies` | PostgreSQL connection |
 | `REDIS_HOST` / `REDIS_PORT` | `localhost` / `6379` | Redis connection |
+| `CORS_ORIGIN` | _(empty)_ | Comma-separated allowed origins; credentials (cookies) are shared only with these. Empty reflects any origin without credentials |
 | `CACHE_TTL_MS` | `60000` | TTL for cached read responses |
 | `TMDB_API_KEY` | _(empty)_ | Either the TMDB v3 "API Key" or the JWT "API Read Access Token" — the client auto-detects which and authenticates per TMDB's docs. Sync is skipped (with a warning) when unset |
 | `TMDB_BASE_URL` | `https://api.themoviedb.org/3` | TMDB API base URL |
 | `TMDB_SYNC_PAGES` | `5` | Popular-movie pages to sync (20 movies per page) |
-| `JWT_ACCESS_SECRET` / `JWT_REFRESH_SECRET` | dev defaults | Token signing secrets — set real values in production |
+| `JWT_ACCESS_SECRET` / `JWT_REFRESH_SECRET` | dev defaults | Token signing secrets — **required** in production; the app refuses to boot if the defaults are left in place |
 | `JWT_ACCESS_EXPIRES_IN` / `JWT_REFRESH_EXPIRES_IN` | `15m` / `7d` | Token lifetimes |
 
 ## Scripts
