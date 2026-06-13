@@ -379,7 +379,7 @@ describe('Movies API (e2e)', () => {
       const response = await request(server)
         .post('/sync')
         .set('Authorization', `Bearer ${bearerToken}`)
-        .expect(201);
+        .expect(200);
       expect(response.body).toEqual({ genres: 0, movies: 0 });
     });
   });

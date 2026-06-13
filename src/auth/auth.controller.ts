@@ -28,13 +28,15 @@ const AUTH_THROTTLE = { default: { ttl: 60_000, limit: 10 } };
 @ApiTooManyRequestsResponse({ description: 'Auth endpoints allow 10 requests per minute' })
 @Controller('auth')
 export class AuthController {
-  private readonly isProduction: boolean;
+  private readonly cookiesAreSecure: boolean;
 
   constructor(
     private readonly authService: AuthService,
     configService: ConfigService,
   ) {
-    this.isProduction = configService.get<string>('app.env') === 'production';
+    // Tokens must only travel over HTTPS everywhere except the test runner;
+    // localhost is treated as a secure context by browsers, so dev still works.
+    this.cookiesAreSecure = configService.get<string>('app.env') !== 'test';
   }
 
   @Post('register')
@@ -114,7 +116,7 @@ export class AuthController {
     return {
       httpOnly: true,
       sameSite: 'lax',
-      secure: this.isProduction,
+      secure: this.cookiesAreSecure,
       path,
     };
   }

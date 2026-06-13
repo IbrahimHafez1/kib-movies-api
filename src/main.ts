@@ -57,23 +57,23 @@ Errors use a consistent envelope: \`{ "message": string | string[], "error": str
   });
 
   const configService = app.get(ConfigService);
-  warnOnDefaultSecrets(configService);
+  assertSecretsConfigured(configService);
   const port = configService.getOrThrow<number>('app.port');
   await app.listen(port);
   Logger.log(`Application is running on http://localhost:${port}`, 'Bootstrap');
   Logger.log(`API documentation available at http://localhost:${port}/docs`, 'Bootstrap');
 }
 
-function warnOnDefaultSecrets(configService: ConfigService): void {
+function assertSecretsConfigured(configService: ConfigService): void {
   const usingDefaults = [
     configService.get<string>('auth.accessSecret'),
     configService.get<string>('auth.refreshSecret'),
   ].some((secret) => secret?.startsWith('change-me'));
 
   if (configService.get<string>('app.env') === 'production' && usingDefaults) {
-    Logger.warn(
-      'JWT secrets are using default values; set JWT_ACCESS_SECRET and JWT_REFRESH_SECRET',
-      'Bootstrap',
+    // Refuse to boot with predictable signing keys in production.
+    throw new Error(
+      'JWT secrets must be configured in production: set JWT_ACCESS_SECRET and JWT_REFRESH_SECRET',
     );
   }
 }
