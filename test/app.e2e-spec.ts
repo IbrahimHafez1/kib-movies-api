@@ -159,7 +159,10 @@ describe('Movies API (e2e)', () => {
         title: 'The Dark Knight',
         averageRating: 0,
         ratingCount: 0,
+        posterUrl: 'https://image.tmdb.org/t/p/w500/tdk.jpg',
+        backdropUrl: 'https://image.tmdb.org/t/p/w1280/tdk-bg.jpg',
       });
+      expect(response.body.data[0].posterPath).toBeUndefined();
     });
 
     it('filters by genre name and by TMDB genre id', async () => {
@@ -376,11 +379,24 @@ describe('Movies API (e2e)', () => {
     it('protects the manual sync endpoint and skips cleanly without a TMDB key', async () => {
       await request(server).post('/sync').expect(401);
 
-      const response = await request(server)
+      const accepted = await request(server)
         .post('/sync')
         .set('Authorization', `Bearer ${bearerToken}`)
-        .expect(200);
-      expect(response.body).toEqual({ genres: 0, movies: 0 });
+        .expect(202);
+      expect(accepted.body.state).toBe('running');
+
+      // The background sync settles quickly without a key; poll until it reports idle.
+      let status = accepted.body;
+      for (let attempt = 0; attempt < 10 && status.state !== 'idle'; attempt++) {
+        await new Promise((resolve) => setTimeout(resolve, 25));
+        const polled = await request(server)
+          .get('/sync/status')
+          .set('Authorization', `Bearer ${bearerToken}`)
+          .expect(200);
+        status = polled.body;
+      }
+      expect(status.state).toBe('idle');
+      expect(status.lastResult).toEqual({ genres: 0, movies: 0 });
     });
   });
 });
