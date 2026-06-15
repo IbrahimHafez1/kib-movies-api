@@ -153,6 +153,56 @@ describe('SyncService', () => {
     });
   });
 
+  describe('requestSync', () => {
+    const flush = (): Promise<void> => new Promise((resolve) => setImmediate(resolve));
+
+    beforeEach(() => {
+      tmdbService.fetchPopularMovies.mockResolvedValue({
+        page: 1,
+        results: [tmdbMovie(1)],
+        total_pages: 1,
+        total_results: 1,
+      });
+    });
+
+    it('returns immediately as running, then settles to idle with the result', async () => {
+      const accepted = service.requestSync();
+      expect(accepted.state).toBe('running');
+      expect(accepted.startedAt).not.toBeNull();
+      expect(accepted.finishedAt).toBeNull();
+
+      await flush();
+
+      const status = service.getSyncStatus();
+      expect(status.state).toBe('idle');
+      expect(status.lastResult).toEqual({ genres: 1, movies: 1 });
+      expect(status.lastError).toBeNull();
+      expect(status.finishedAt).not.toBeNull();
+    });
+
+    it('does not start a second sync while one is already running', async () => {
+      service.requestSync();
+      const second = service.requestSync();
+
+      expect(second.state).toBe('running');
+      expect(tmdbService.fetchGenres).toHaveBeenCalledTimes(1);
+
+      await flush();
+    });
+
+    it('records the error when a background sync fails', async () => {
+      tmdbService.fetchGenres.mockRejectedValueOnce(new Error('TMDB down'));
+
+      service.requestSync();
+      await flush();
+
+      const status = service.getSyncStatus();
+      expect(status.state).toBe('idle');
+      expect(status.lastError).toBe('TMDB down');
+      expect(status.lastResult).toBeNull();
+    });
+  });
+
   describe('syncChangedMovies', () => {
     const movieDetails = (id: number) => ({
       id,

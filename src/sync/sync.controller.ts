@@ -1,5 +1,6 @@
-import { Controller, HttpCode, HttpStatus, Post, UseGuards } from '@nestjs/common';
+import { Controller, Get, HttpCode, HttpStatus, Post, UseGuards } from '@nestjs/common';
 import {
+  ApiAcceptedResponse,
   ApiBearerAuth,
   ApiCookieAuth,
   ApiOkResponse,
@@ -8,8 +9,8 @@ import {
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { SyncResultDto } from './dto/sync-result.dto';
-import { SyncResult, SyncService } from './sync.service';
+import { SyncStatusDto } from './dto/sync-status.dto';
+import { SyncStatus, SyncService } from './sync.service';
 
 @ApiTags('sync')
 @ApiBearerAuth()
@@ -22,17 +23,31 @@ export class SyncController {
   // rate-limited, so the blast radius is a few TMDB calls. Admin-only RBAC is the
   // documented next step rather than speculative scope.
   @Post()
-  @HttpCode(HttpStatus.OK)
+  @HttpCode(HttpStatus.ACCEPTED)
   @UseGuards(JwtAuthGuard)
   @ApiOperation({
     summary: 'Trigger a TMDB sync on demand',
     description:
-      'Upserts genres and popular movies from TMDB. Idempotent: running it repeatedly ' +
-      'converges instead of duplicating. Returns zero counts when no TMDB key is configured.',
+      'Starts a background sync of genres and popular movies from TMDB and returns 202 ' +
+      'immediately. Idempotent: running it repeatedly converges instead of duplicating. ' +
+      'A request received while a sync is already running is a no-op. Poll GET /sync/status ' +
+      'for progress and the resulting counts.',
   })
-  @ApiOkResponse({ type: SyncResultDto, description: 'Number of genres and movies synced' })
+  @ApiAcceptedResponse({ type: SyncStatusDto, description: 'Sync accepted; current status' })
   @ApiUnauthorizedResponse({ description: 'Missing or expired credentials' })
-  sync(): Promise<SyncResult> {
-    return this.syncService.syncAll();
+  sync(): SyncStatus {
+    return this.syncService.requestSync();
+  }
+
+  @Get('status')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({
+    summary: 'Report the status of the on-demand sync',
+    description: 'Returns whether a sync is running plus the counts from the most recent run.',
+  })
+  @ApiOkResponse({ type: SyncStatusDto, description: 'Current sync status' })
+  @ApiUnauthorizedResponse({ description: 'Missing or expired credentials' })
+  status(): SyncStatus {
+    return this.syncService.getSyncStatus();
   }
 }

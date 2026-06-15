@@ -16,6 +16,16 @@ export interface SyncResult {
   movies: number;
 }
 
+export type SyncState = 'idle' | 'running';
+
+export interface SyncStatus {
+  state: SyncState;
+  startedAt: string | null;
+  finishedAt: string | null;
+  lastResult: SyncResult | null;
+  lastError: string | null;
+}
+
 /** Window the incremental sync looks back over; generous to absorb missed runs. */
 const CHANGES_LOOKBACK_MS = 24 * 60 * 60 * 1000;
 
@@ -38,6 +48,13 @@ const MAX_CHANGE_PAGES = 50;
 export class SyncService implements OnApplicationBootstrap {
   private readonly logger = new Logger(SyncService.name);
   private readonly pagesToSync: number;
+  private syncStatus: SyncStatus = {
+    state: 'idle',
+    startedAt: null,
+    finishedAt: null,
+    lastResult: null,
+    lastError: null,
+  };
 
   constructor(
     private readonly tmdbService: TmdbService,
@@ -90,6 +107,53 @@ export class SyncService implements OnApplicationBootstrap {
     await this.invalidateReadCaches();
     this.logger.log(`Sync complete: ${genresSynced} genres, ${moviesSynced} movies`);
     return { genres: genresSynced, movies: moviesSynced };
+  }
+
+  /**
+   * Starts a full sync in the background and returns immediately, so callers
+   * are not blocked on TMDB round-trips. A second request while one is already
+   * running is a no-op that simply reports the in-progress status.
+   */
+  requestSync(): SyncStatus {
+    if (this.syncStatus.state === 'running') {
+      return this.getSyncStatus();
+    }
+    this.syncStatus = {
+      ...this.syncStatus,
+      state: 'running',
+      startedAt: new Date().toISOString(),
+      finishedAt: null,
+    };
+    void this.runTrackedSync();
+    return this.getSyncStatus();
+  }
+
+  /** Snapshot of the most recent on-demand sync, for polling progress. */
+  getSyncStatus(): SyncStatus {
+    return { ...this.syncStatus };
+  }
+
+  private async runTrackedSync(): Promise<void> {
+    try {
+      const result = await this.syncAll();
+      this.syncStatus = {
+        state: 'idle',
+        startedAt: this.syncStatus.startedAt,
+        finishedAt: new Date().toISOString(),
+        lastResult: result,
+        lastError: null,
+      };
+    } catch (error) {
+      const message = (error as Error).message;
+      this.logger.error(`On-demand sync failed: ${message}`);
+      this.syncStatus = {
+        state: 'idle',
+        startedAt: this.syncStatus.startedAt,
+        finishedAt: new Date().toISOString(),
+        lastResult: null,
+        lastError: message,
+      };
+    }
   }
 
   /**
