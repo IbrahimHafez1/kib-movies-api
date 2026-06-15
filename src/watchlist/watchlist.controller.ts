@@ -15,6 +15,7 @@ import {
   ApiConflictResponse,
   ApiCookieAuth,
   ApiCreatedResponse,
+  ApiNoContentResponse,
   ApiNotFoundResponse,
   ApiOperation,
   ApiParam,
@@ -65,6 +66,7 @@ export class WatchlistController {
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Remove a movie from the watchlist' })
   @ApiParam({ name: 'movieId', description: 'TMDB movie id', example: 603 })
+  @ApiNoContentResponse({ description: 'Movie removed from the watchlist' })
   @ApiNotFoundResponse({ description: 'Movie not in watchlist' })
   remove(
     @CurrentUser() user: AuthenticatedUser,
