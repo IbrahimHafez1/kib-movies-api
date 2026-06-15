@@ -13,6 +13,7 @@ import {
   ApiBadRequestResponse,
   ApiBearerAuth,
   ApiCookieAuth,
+  ApiNoContentResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
@@ -52,6 +53,7 @@ export class RatingsController {
   @Delete()
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Remove your rating for a movie' })
+  @ApiNoContentResponse({ description: 'Rating removed' })
   @ApiNotFoundResponse({ description: 'Rating not found' })
   deleteRating(
     @CurrentUser() user: AuthenticatedUser,

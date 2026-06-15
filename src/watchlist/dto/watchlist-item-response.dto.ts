@@ -12,11 +12,15 @@ export class WatchlistItemResponseDto {
   @ApiProperty({ type: MovieResponseDto })
   movie: MovieResponseDto;
 
-  static fromEntity(item: WatchlistItem, stats?: RatingStats): WatchlistItemResponseDto {
+  static fromEntity(
+    item: WatchlistItem,
+    imageBaseUrl: string,
+    stats?: RatingStats,
+  ): WatchlistItemResponseDto {
     return {
       movieId: item.movieId,
       addedAt: item.createdAt,
-      movie: MovieResponseDto.fromEntity(item.movie, stats),
+      movie: MovieResponseDto.fromEntity(item.movie, imageBaseUrl, stats),
     };
   }
 }

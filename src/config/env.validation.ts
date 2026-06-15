@@ -43,6 +43,10 @@ export class EnvironmentVariables {
   TMDB_API_KEY?: string;
 
   @IsOptional()
+  @IsString()
+  TMDB_IMAGE_BASE_URL?: string;
+
+  @IsOptional()
   @IsInt()
   @Min(1)
   @Max(500)

@@ -24,6 +24,7 @@ const SORT_COLUMNS: Record<Exclude<MovieSortBy, MovieSortBy.AVERAGE_RATING>, str
 @Injectable()
 export class MoviesService {
   private readonly cacheTtlMs: number;
+  private readonly imageBaseUrl: string;
 
   constructor(
     @InjectRepository(Movie) private readonly moviesRepository: Repository<Movie>,
@@ -32,6 +33,7 @@ export class MoviesService {
     configService: ConfigService,
   ) {
     this.cacheTtlMs = configService.getOrThrow<number>('cache.ttlMs');
+    this.imageBaseUrl = configService.getOrThrow<string>('tmdb.imageBaseUrl');
   }
 
   async findAll(query: ListMoviesQueryDto): Promise<PaginatedResponseDto<MovieResponseDto>> {
@@ -49,7 +51,7 @@ export class MoviesService {
         throw new NotFoundException(`Movie ${id} not found`);
       }
       const stats = await this.getRatingStats([id]);
-      return MovieResponseDto.fromEntity(movie, stats.get(id));
+      return MovieResponseDto.fromEntity(movie, this.imageBaseUrl, stats.get(id));
     });
   }
 
@@ -77,7 +79,7 @@ export class MoviesService {
     ]);
 
     const data = moviesWithGenres.map((movie) =>
-      MovieResponseDto.fromEntity(movie, stats.get(movie.id)),
+      MovieResponseDto.fromEntity(movie, this.imageBaseUrl, stats.get(movie.id)),
     );
     return PaginatedResponseDto.of(data, totalItems, query.page, query.limit);
   }

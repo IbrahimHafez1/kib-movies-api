@@ -70,7 +70,9 @@ describe('MoviesService', () => {
       bumpNamespaceVersion: jest.fn(),
     };
     const configService = {
-      getOrThrow: jest.fn().mockReturnValue(60_000),
+      getOrThrow: jest.fn((key: string) =>
+        key === 'tmdb.imageBaseUrl' ? 'https://image.tmdb.org/t/p' : 60_000,
+      ),
     } as unknown as ConfigService;
 
     service = new MoviesService(
@@ -85,7 +87,11 @@ describe('MoviesService', () => {
     it('returns paginated movies enriched with rating stats', async () => {
       moviesQueryBuilder.getManyAndCount.mockResolvedValue([[movie(1), movie(2)], 25]);
       moviesRepository.find.mockResolvedValue([
-        movie(1, { genres: [{ id: 28, name: 'Action' }] }),
+        movie(1, {
+          genres: [{ id: 28, name: 'Action' }],
+          posterPath: '/poster.jpg',
+          backdropPath: '/backdrop.jpg',
+        }),
         movie(2),
       ]);
       ratingsQueryBuilder.getRawMany.mockResolvedValue([
@@ -106,8 +112,17 @@ describe('MoviesService', () => {
         averageRating: 8.3,
         ratingCount: 4,
         genres: [{ id: 28, name: 'Action' }],
+        posterUrl: 'https://image.tmdb.org/t/p/w500/poster.jpg',
+        backdropUrl: 'https://image.tmdb.org/t/p/w1280/backdrop.jpg',
       });
-      expect(result.data[1]).toMatchObject({ id: 2, averageRating: 0, ratingCount: 0 });
+      // A movie with no poster/backdrop yields null URLs rather than a broken link.
+      expect(result.data[1]).toMatchObject({
+        id: 2,
+        averageRating: 0,
+        ratingCount: 0,
+        posterUrl: null,
+        backdropUrl: null,
+      });
     });
 
     it('applies the title search filter', async () => {

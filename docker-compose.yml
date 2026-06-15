@@ -17,6 +17,7 @@ services:
       CACHE_TTL_MS: ${CACHE_TTL_MS:-60000}
       TMDB_API_KEY: ${TMDB_API_KEY:-}
       TMDB_BASE_URL: ${TMDB_BASE_URL:-https://api.themoviedb.org/3}
+      TMDB_IMAGE_BASE_URL: ${TMDB_IMAGE_BASE_URL:-https://image.tmdb.org/t/p}
       TMDB_SYNC_PAGES: ${TMDB_SYNC_PAGES:-5}
       # Demo defaults so `docker-compose up` works with zero config; override with real
       # secrets in any real deployment (the app refuses to boot on the change-me placeholders).
