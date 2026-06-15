@@ -125,7 +125,8 @@ Full request/response schemas live in Swagger (`/docs`). Endpoints marked 🔒 r
 | POST | `/auth/login` | Log in (sets auth cookies) |
 | POST | `/auth/refresh` | Rotate the refresh token, issue a new access token |
 | POST 🔒 | `/auth/logout` | Revoke the refresh token, clear cookies |
-| POST 🔒 | `/sync` | Trigger a TMDB sync on demand |
+| POST 🔒 | `/sync` | Trigger a TMDB sync on demand; returns `202 Accepted` and runs in the background |
+| GET 🔒 | `/sync/status` | Report whether a sync is running plus the counts from the most recent run |
 | GET | `/health` | Liveness + database/cache connectivity (used by the Docker healthcheck) |
 
 Example session:
@@ -155,8 +156,8 @@ Sample `GET /movies` response:
       "originalTitle": "The Matrix",
       "overview": "A hacker discovers that reality is a simulation.",
       "releaseDate": "1999-03-31",
-      "posterPath": "/p96dm7sCMn4VYAStA6siNz30G1r.jpg",
-      "backdropPath": "/icmmfXiqwiryeg1mD3YgSQ4dGm6.jpg",
+      "posterUrl": "https://image.tmdb.org/t/p/w500/p96dm7sCMn4VYAStA6siNz30G1r.jpg",
+      "backdropUrl": "https://image.tmdb.org/t/p/w1280/icmmfXiqwiryeg1mD3YgSQ4dGm6.jpg",
       "originalLanguage": "en",
       "popularity": 85.5,
       "tmdbVoteAverage": 8.2,
