@@ -32,13 +32,13 @@ A production-ready RESTful API built with **NestJS** that syncs movie data from 
 
 ## Features
 
-- **TMDB sync** — genres and popular movies are upserted on first boot, daily (cron), or on demand via `POST /sync`. An incremental job additionally polls TMDB's changes feed every 6 hours and refreshes only tracked movies that actually changed. Syncs are idempotent, so re-runs and future data additions are safe.
+- **TMDB sync** — genres and popular movies are upserted on first boot, daily (cron), or on demand via `POST /sync` (which returns `202` and runs in the background; poll `GET /sync/status` for progress). An incremental job additionally polls TMDB's changes feed every 6 hours and refreshes only tracked movies that actually changed. Syncs are idempotent, so re-runs and future data additions are safe.
 - **Browse movies** — pagination, title search, genre filtering (by name or TMDB id), sorting by popularity, release date, title or average user rating.
 - **Ratings** — authenticated users rate movies 1–10 (create/update/delete); every movie response includes the live average rating and rating count.
 - **Watchlist** — add/remove/list movies per user.
 - **Caching** — Redis-backed read cache with O(1) namespace invalidation when ratings or syncs change the data.
 - **Auth** — JWT access tokens (15 min) + rotating refresh tokens (7 days), both as httpOnly cookies; `Authorization: Bearer` is also accepted for non-browser clients. Refresh tokens are stored hashed and revoked on logout.
-- **Hardening** — rate limiting, helmet security headers, strict input validation, race-safe writes, TMDB retries with backoff, non-root Docker runtime.
+- **Hardening** — rate limiting, helmet security headers, gzip response compression, strict input validation, race-safe writes, TMDB retries with backoff, non-root Docker runtime.
 
 ## Tech Stack
 
@@ -320,6 +320,7 @@ All settings come from environment variables (see `.env.example`):
 | `CACHE_TTL_MS` | `60000` | TTL for cached read responses |
 | `TMDB_API_KEY` | _(empty)_ | Either the TMDB v3 "API Key" or the JWT "API Read Access Token" — the client auto-detects which and authenticates per TMDB's docs. Sync is skipped (with a warning) when unset |
 | `TMDB_BASE_URL` | `https://api.themoviedb.org/3` | TMDB API base URL |
+| `TMDB_IMAGE_BASE_URL` | `https://image.tmdb.org/t/p` | TMDB image CDN base; movie responses expose full `posterUrl`/`backdropUrl` built from it |
 | `TMDB_SYNC_PAGES` | `5` | Popular-movie pages to sync (20 movies per page) |
 | `JWT_ACCESS_SECRET` / `JWT_REFRESH_SECRET` | dev defaults | Token signing secrets — **required** in production; the app refuses to boot if the defaults are left in place |
 | `JWT_ACCESS_EXPIRES_IN` / `JWT_REFRESH_EXPIRES_IN` | `15m` / `7d` | Token lifetimes |
