@@ -1,4 +1,5 @@
 import { ConflictException, NotFoundException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { QueryFailedError, Repository } from 'typeorm';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { Movie } from '../movies/entities/movie.entity';
@@ -32,10 +33,14 @@ describe('WatchlistService', () => {
     moviesService = {
       getRatingStats: jest.fn().mockResolvedValue(new Map([[603, { average: 8, count: 2 }]])),
     };
+    const configService = {
+      getOrThrow: jest.fn().mockReturnValue('https://image.tmdb.org/t/p'),
+    } as unknown as ConfigService;
     service = new WatchlistService(
       watchlistRepository as unknown as Repository<WatchlistItem>,
       moviesRepository as unknown as Repository<Movie>,
       moviesService as unknown as MoviesService,
+      configService,
     );
   });
 

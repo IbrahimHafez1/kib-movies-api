@@ -20,6 +20,7 @@ export default () => ({
   tmdb: {
     apiKey: process.env.TMDB_API_KEY ?? '',
     baseUrl: process.env.TMDB_BASE_URL ?? 'https://api.themoviedb.org/3',
+    imageBaseUrl: process.env.TMDB_IMAGE_BASE_URL ?? 'https://image.tmdb.org/t/p',
     syncPages: parseInt(process.env.TMDB_SYNC_PAGES ?? '5', 10),
   },
   auth: {

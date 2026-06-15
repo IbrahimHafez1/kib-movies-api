@@ -1,4 +1,5 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { isForeignKeyViolation, isUniqueViolation } from '../common/database-errors';
@@ -11,12 +12,17 @@ import { WatchlistItem } from './entities/watchlist-item.entity';
 
 @Injectable()
 export class WatchlistService {
+  private readonly imageBaseUrl: string;
+
   constructor(
     @InjectRepository(WatchlistItem)
     private readonly watchlistRepository: Repository<WatchlistItem>,
     @InjectRepository(Movie) private readonly moviesRepository: Repository<Movie>,
     private readonly moviesService: MoviesService,
-  ) {}
+    configService: ConfigService,
+  ) {
+    this.imageBaseUrl = configService.getOrThrow<string>('tmdb.imageBaseUrl');
+  }
 
   async add(userId: string, movieId: number): Promise<WatchlistItemResponseDto> {
     const movie = await this.moviesRepository.findOne({
@@ -49,7 +55,7 @@ export class WatchlistService {
     }
     item.movie = movie;
     const stats = await this.moviesService.getRatingStats([movieId]);
-    return WatchlistItemResponseDto.fromEntity(item, stats.get(movieId));
+    return WatchlistItemResponseDto.fromEntity(item, this.imageBaseUrl, stats.get(movieId));
   }
 
   async remove(userId: string, movieId: number): Promise<void> {
@@ -73,7 +79,7 @@ export class WatchlistService {
 
     const stats = await this.moviesService.getRatingStats(items.map((item) => item.movieId));
     const data = items.map((item) =>
-      WatchlistItemResponseDto.fromEntity(item, stats.get(item.movieId)),
+      WatchlistItemResponseDto.fromEntity(item, this.imageBaseUrl, stats.get(item.movieId)),
     );
     return PaginatedResponseDto.of(data, totalItems, query.page, query.limit);
   }

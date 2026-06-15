@@ -9,6 +9,14 @@ export interface RatingStats {
 
 const EMPTY_STATS: RatingStats = { average: 0, count: 0 };
 
+/** TMDB image sizes (https://developer.themoviedb.org/docs/image-basics) used for full URLs. */
+const POSTER_SIZE = 'w500';
+const BACKDROP_SIZE = 'w1280';
+
+/** Builds a ready-to-use TMDB CDN URL from a stored relative path, or null when there is none. */
+const buildImageUrl = (imageBaseUrl: string, size: string, path: string | null): string | null =>
+  path ? `${imageBaseUrl}/${size}${path}` : null;
+
 export class MovieResponseDto {
   @ApiProperty({ description: 'TMDB movie id', example: 603 })
   id: number;
@@ -29,11 +37,21 @@ export class MovieResponseDto {
   @ApiProperty({ nullable: true, type: String, example: '1999-03-31' })
   releaseDate: string | null;
 
-  @ApiProperty({ nullable: true, type: String, example: '/p96dm7sCMn4VYAStA6siNz30G1r.jpg' })
-  posterPath: string | null;
+  @ApiProperty({
+    nullable: true,
+    type: String,
+    description: 'Full poster URL on the TMDB image CDN; null when the movie has no poster',
+    example: 'https://image.tmdb.org/t/p/w500/p96dm7sCMn4VYAStA6siNz30G1r.jpg',
+  })
+  posterUrl: string | null;
 
-  @ApiProperty({ nullable: true, type: String, example: '/icmmfXiqwiryeg1mD3YgSQ4dGm6.jpg' })
-  backdropPath: string | null;
+  @ApiProperty({
+    nullable: true,
+    type: String,
+    description: 'Full backdrop URL on the TMDB image CDN; null when the movie has no backdrop',
+    example: 'https://image.tmdb.org/t/p/w1280/icmmfXiqwiryeg1mD3YgSQ4dGm6.jpg',
+  })
+  backdropUrl: string | null;
 
   @ApiProperty({ nullable: true, type: String, example: 'en' })
   originalLanguage: string | null;
@@ -59,15 +77,19 @@ export class MovieResponseDto {
   @ApiProperty({ description: 'Number of user ratings submitted to this API', example: 2 })
   ratingCount: number;
 
-  static fromEntity(movie: Movie, stats: RatingStats = EMPTY_STATS): MovieResponseDto {
+  static fromEntity(
+    movie: Movie,
+    imageBaseUrl: string,
+    stats: RatingStats = EMPTY_STATS,
+  ): MovieResponseDto {
     return {
       id: movie.id,
       title: movie.title,
       originalTitle: movie.originalTitle,
       overview: movie.overview,
       releaseDate: movie.releaseDate,
-      posterPath: movie.posterPath,
-      backdropPath: movie.backdropPath,
+      posterUrl: buildImageUrl(imageBaseUrl, POSTER_SIZE, movie.posterPath),
+      backdropUrl: buildImageUrl(imageBaseUrl, BACKDROP_SIZE, movie.backdropPath),
       originalLanguage: movie.originalLanguage,
       popularity: movie.popularity,
       tmdbVoteAverage: movie.tmdbVoteAverage,
